@@ -7,6 +7,8 @@ from urllib.request import urlopen
 from xml.etree import ElementTree
 
 from .config import PACKAGE_ID, validate_url
+from .graph import Package
+from .requirements import select_version
 from .version import normalize
 
 TIMEOUT = 15
@@ -81,9 +83,9 @@ def parse_manifest(data):
     dependencies = metadata.find("{*}dependencies")
     if dependencies is None:
         return ()
-    result = [read_declaration(item) for item in dependencies.findall(
-        "{*}dependency"
-    )]
+    result = [
+        read_declaration(item) for item in dependencies.findall("{*}dependency")
+    ]
     for group in dependencies.findall("{*}group"):
         framework = group.get("targetFramework", "")
         result.extend(
@@ -96,10 +98,13 @@ def parse_manifest(data):
 class NuGetRepository:
     """Access and cache metadata for a single NuGet source."""
 
-    def __init__(self, url):
+    def __init__(self, url, allow_prerelease=False):
         """Discover flat-container endpoints for the given index."""
         self.base = discover_base(url)
         self.manifests = {}
+        self.versions = {}
+        self.resolved = {}
+        self.allow_prerelease = allow_prerelease
 
     def declarations(self, package, version):
         """Find dependency declarations for the requested exact version."""
@@ -112,3 +117,41 @@ class NuGetRepository:
             except RepositoryError as error:
                 raise RepositoryError(f"{name}@{version}: {error}") from error
         return self.manifests[key]
+
+    def require(self, root):
+        """Verify the exact root exists even when max depth is zero."""
+        self.declarations(root.name, root.version)
+
+    def available_versions(self, name):
+        """Get normalized version strings from the package's feed index."""
+        if name not in self.versions:
+            url = f"{self.base}/{name}/index.json"
+            try:
+                versions = read_json(url)["versions"]
+                if not isinstance(versions, list):
+                    raise TypeError("versions must be an array")
+                self.versions[name] = tuple(map(normalize, versions))
+            except (KeyError, TypeError, ValueError) as error:
+                raise RepositoryError(f"{url}: {error}") from error
+        return self.versions[name]
+
+    def resolve(self, declaration):
+        """Find the lowest published version for one dependency."""
+        name = declaration.package.lower()
+        spec = declaration.requirement
+        key = name, spec
+        if key not in self.resolved:
+            version = select_version(
+                self.available_versions(name), spec, self.allow_prerelease,
+            )
+            if version is None:
+                raise RepositoryError(f"нет версии {name} для {spec or '*'}")
+            self.resolved[key] = Package(name, version)
+        return self.resolved[key]
+
+    def neighbors(self, node):
+        """Resolve declarations across all framework groups."""
+        return tuple(
+            self.resolve(item)
+            for item in self.declarations(node.name, node.version)
+        )

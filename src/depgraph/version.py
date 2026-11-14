@@ -16,3 +16,16 @@ def normalize(value):
         parts.pop()
     canonical = ".".join(map(str, parts))
     return f"{canonical}-{label.lower()}" if label else canonical
+
+
+def label_key(part):
+    """Sort numeric prerelease identifiers before textual identifiers."""
+    return (0, int(part)) if part.isdecimal() else (1, part)
+
+
+def version_key(version):
+    """Compare four numeric components, then prerelease segments."""
+    core, _, label = normalize(version).partition("-")
+    parts = tuple(map(int, core.split(".")))
+    parts = (*parts, 0) if len(parts) == STANDARD_PARTS else parts
+    return parts, not bool(label), tuple(map(label_key, label.split(".")))
