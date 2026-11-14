@@ -3,7 +3,7 @@
 import sys
 
 from .config import parse_config
-from .graph import Package, format_graph, walk
+from .graph import Package, format_graph, reverse_dependencies, walk
 from .local import TestRepository
 from .nuget import NuGetRepository
 from .version import normalize
@@ -23,14 +23,23 @@ def prepare(config):
 
 
 def main(argv=None):
-    """Print the depth-limited dependency graph as an adjacency list."""
+    """Print the forward graph or the list of reverse dependencies."""
     config = parse_config(argv)
     try:
         root, source = prepare(config)
-        graph = walk(root, config.max_depth, source.neighbors)
+        if config.reverse:
+            dependents = reverse_dependencies(
+                source.graph, root, config.max_depth,
+            )
+            for node in dependents:
+                print(node)
+            if not dependents:
+                print("Обратных зависимостей нет.")
+        else:
+            graph = walk(root, config.max_depth, source.neighbors)
+            for line in format_graph(graph):
+                print(line)
     except (OSError, ValueError) as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1
-    for line in format_graph(graph):
-        print(line)
     return 0

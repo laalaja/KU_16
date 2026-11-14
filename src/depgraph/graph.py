@@ -42,3 +42,19 @@ def format_graph(graph):
                 yield f"{node} -> {child}"
         else:
             yield str(node)
+
+
+def transpose(graph):
+    """Map each package version to the versions that depend on it."""
+    incoming = {package: [] for package in graph}
+    for package, dependencies in graph.items():
+        for dependency in dependencies:
+            incoming[dependency].append(package)
+    return incoming
+
+
+def reverse_dependencies(graph, root, max_depth):
+    """Return direct and transitive dependents, excluding the root."""
+    incoming = transpose(graph)
+    return tuple(node for node in walk(root, max_depth, incoming.__getitem__)
+                 if node != root)
