@@ -1,9 +1,10 @@
-"""Build a graph from CLI options and report user-facing errors."""
+"""Build a dependency graph and print it in D2 format."""
 
 import sys
 
 from .config import parse_config
-from .graph import Package, format_graph, reverse_dependencies, walk
+from .d2 import render
+from .graph import Package, walk
 from .local import TestRepository
 from .nuget import NuGetRepository
 from .version import normalize
@@ -23,23 +24,13 @@ def prepare(config):
 
 
 def main(argv=None):
-    """Print the forward graph or the list of reverse dependencies."""
+    """Print D2 to stdout and errors to stderr."""
     config = parse_config(argv)
     try:
         root, source = prepare(config)
-        if config.reverse:
-            dependents = reverse_dependencies(
-                source.graph, root, config.max_depth,
-            )
-            for node in dependents:
-                print(node)
-            if not dependents:
-                print("Обратных зависимостей нет.")
-        else:
-            graph = walk(root, config.max_depth, source.neighbors)
-            for line in format_graph(graph):
-                print(line)
+        graph = walk(root, config.max_depth, source.neighbors)
     except (OSError, ValueError) as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1
+    print(render(graph, root), end="")
     return 0

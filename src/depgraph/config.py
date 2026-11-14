@@ -28,7 +28,6 @@ class Config:
     test_mode: bool
     version: str
     max_depth: int
-    reverse: bool
 
 
 def validate_url(value):
@@ -63,10 +62,6 @@ def make_parser():
     parser.add_argument("--test-mode", action="store_true", help="читать файл")
     parser.add_argument("--version", required=True, help="точная версия пакета")
     parser.add_argument(
-        "--reverse", action="store_true",
-        help="найти обратные зависимости в тестовом репозитории",
-    )
-    parser.add_argument(
         "--max-depth", type=int, default=DEFAULT_DEPTH,
         help="глубина: 0 — только корневой пакет (по умолчанию: %(default)s)",
     )
@@ -84,8 +79,6 @@ def parse_config(argv=None):
         parser.error("--version: требуется точная версия NuGet")
     if args.max_depth < ROOT_DEPTH:
         parser.error("--max-depth: требуется неотрицательное число")
-    if args.reverse and not args.test_mode:
-        parser.error("--reverse: требуется --test-mode")
     try:
         args.repository = repository(args.repository, args.test_mode)
     except (ValueError, OSError) as error:

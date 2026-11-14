@@ -34,16 +34,6 @@ def walk(root, max_depth, neighbors):
     return graph
 
 
-def format_graph(graph):
-    """Show roots, leaves and edges without hiding cycles."""
-    for node, children in graph.items():
-        if children:
-            for child in children:
-                yield f"{node} -> {child}"
-        else:
-            yield str(node)
-
-
 def transpose(graph):
     """Map each package version to the versions that depend on it."""
     incoming = {package: [] for package in graph}
